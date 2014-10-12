@@ -4,9 +4,14 @@
 
       var VERSION = 1.0.0;
 
-      var actionsPair = [];
+      /*
+        action List heirarchy
+        'actionName' : [
+                        {}
+                      ]
+      */
+      var actionsList = [];
 
-      // get all UI events
 
       var uiActions = 'click dblclick mousedown mouseup mouseover mouseout mousemove mouseenter mouseleave keydown keyup keypress submit focus blur copy cut paste';
 
@@ -17,26 +22,48 @@
           }
       };
 
-      forEach(uiActions , function(action){
+      var compile = function(elem){
 
-          var actionElements = document.querySelector('[action-' + action + ']');
+            elem = elem ? elem : document;
 
-          for(var i=0; i<actionElements.length; i++){
-              var actionElem = actionElements[i];
+            forEach(uiActions , function(action){
 
-              actionElem.addEventListener(action , function (event){
+                var actionElements = elem.querySelector('[action-' + action + ']');
 
-              });
-          }
+                for(var i=0; i<actionElements.length; i++){
+                    var actionElem = actionElements[i];
 
-      });
+                    actionElem.addEventListener(action , function (event){
+                        triggerAction(actionElem.getAttribute('action-'+action) , [event]);
+                    });
+                }
 
-      var addAction = function(actionData , actionName){
-
+            });
       };
 
-      var triggerAction = function(arguments){
+      /*
+        action skeleton
+          {
+              'name' : 'actionName',
+              'async':  can it be executed asynchronously if its async in nature
+              'priority' : priority of the action, priority 1 will be executed first, no limit on highest bound
+              'functionname' : functionRef
+          }
 
+      */
+
+      var addAction = function(actionName , actionName){
+          var action = actionsList[actionName];
+
+          if(action){
+
+          }else{
+              var actions
+          }
+      };
+
+      var triggerAction = function(actionName , [arguments]){
+          // trigger action with arguments
       };
 
       var addURLAction = function(actionsJSON){
