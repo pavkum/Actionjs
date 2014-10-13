@@ -6,12 +6,15 @@ var actionData = {
 actions.registerURLAction(actionData);
 
 
-action.on('homeAction' , ['async' , 'priority' , function(){
+action.on('homeAction' , ['async' , '1' , ['a', 'b'],  function(a, b){
   // assume everything as action
+    set(a , dasd)
+    set(b , asdas)
 }]);
 
-action.on('contactAction' , ['async' , 'priority' , function(){
-
+action.on('homeAction' , ['async' , '2' , ['a' , 'b'] ,function(a,b){
+    get(a)
+    get(b)
 }]);
 
 
