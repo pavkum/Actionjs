@@ -176,39 +176,40 @@
               
           };
             
-          var executePriority = function(actionRef, prioties , actionArguments , position){
+          var executePriority = function(actionRef, priorities , actionArguments , position){
             
-              if(position >= prioties.length){
+              if(position >= priorities.length){
                 return;   
               }
               
-               var priority = prioties[position];
+               var priority = priorities[position];
                       
                var prioritizedActions = actionRef.actions[priority];
               
-               var priority = new PriorityInvoker(prioritizedActions , actionArguments);
+               var onDone = function(){
+                   executePriority(actionRef , priorities , actionArguments , position+1);
+               };
               
-               priority.executeActions();
+               var priority = new PriorityInvoker(prioritizedActions , actionArguments , onDone);
               
-               priority.onDone(function(){
-                    executePriority(actionRef , priorities , actionArguments , position++);
+              
+              
+               priority.onTerminate(function(){
+                // do nothing
                });
               
-              priorities.onTerminate(function(){
-                // do nothing
-              });
+               priority.executeActions();
               
                //executeAction(actionsOfPriority , scope)
               
           };
             
-          var PriorityInvoker = function(prioritizedActions ,actionArguments){
+          var PriorityInvoker = function(prioritizedActions ,actionArguments , done){
               this.prioritizedActions = prioritizedActions;
               this.actionArguments = actionArguments;
+              this.done = done;
               
               this.asyncWaitQueue = 0;
-              
-              
               
               this.asyncWaitCallback = function(asyncStatus){
                   this.asyncWaitQueue = this.asyncWaitQueue - 1;  
@@ -220,6 +221,15 @@
                     }else if(asyncStatus === ASYNC_ERROR){
                            PriorityInvoker.onTerminate.call();
                     }
+              };
+              
+              
+              this.onDone = function(){
+                  this.onDone.call();
+              };
+                
+              this.onTerminate = function(callback){
+                    //callback.call();  
               };
               
           };
@@ -236,22 +246,16 @@
                    }
                   
                   if(!ac.action.apply(this.actionArguments)){
-                        PriorityInvoker.onTerminate.call();
+                        this.onTerminate.call(this);
                   }
                }
               
               if(this.asyncWaitQueue === 0){
-                  PriorityInvoker.onDone.call();  
+                 this.done.call();
               }
           };
             
-          PriorityInvoker.prototype.onDone = function(callback){
-              callback.call();
-          };
-            
-          PriorityInvoker.prototype.onTerminate = function(callback){
-                callback.call();  
-          };
+         
             
           var addURLAction = function(actionsJSON){
     
@@ -276,17 +280,30 @@
           },500);
             
           var triggerHashChange = function(){
-              triggerAction(hash);
-              compile();
+              var presentHash = hash.substr(1,hash.length);
+              if(routerList[presentHash]){
+                triggerAction(routerList[presentHash]);
+                compile();
+              }
+              
+              
           };
             
           var navigate = function(hash , data){
-              if(routerList[hash])
-                window.location.hash - hash;
+              if(routerList[hash]){
+                window.location.hash = hash;
                 triggerAction(routerList[hash] , data);
+                  compile();
+              }
           };
             
           window.onload = function(){
+              if(hash){
+                var presentHash = hash.substr(1,hash.length);
+                 if(routerList[presentHash]){
+                    triggerAction(routerList[presentHash]);
+                }
+              }
               compile();
           };
     
