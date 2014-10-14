@@ -1,8 +1,8 @@
-    (function (){
+    var action = (function (){
     
         var actionjs = function(){
     
-          var VERSION = 1.0.0;
+          var VERSION = "1.0.0";
           var hash = window.location.hash;
             
             
@@ -13,18 +13,18 @@
                             actions :[
                                         "1" : [
                                                 {
-                                                    wait : true / false
+                                                    async_wait : true / false
                                                     action : function reference
                                                     dependencies : dependency variable / obj names
                                                 }
                                             ]
                                     ],
-                            'priority' : [1,2,3]
+                            'priorities' : [1,2,3]
                          }
             
           */
           var actionsList = [];
-    
+          var routerList = [];
     
           var uiActions = 'click dblclick mousedown mouseup mouseover mouseout mousemove mouseenter mouseleave keydown keyup keypress submit focus blur copy cut paste';
     
@@ -41,13 +41,16 @@
     
                 forEach(uiActions , function(action){
     
-                    var actionElements = elem.querySelector('[action-' + action + ']');
+                    var actionElements = elem.querySelectorAll('[action-' + action + ']');
     
+                    if(!actionElements)
+                        return;
+                    
                     for(var i=0; i<actionElements.length; i++){
                         var actionElem = actionElements[i];
     
                         actionElem.addEventListener(action , function (event){
-                            triggerAction(actionElem.getAttribute('action-'+action) , [event]);
+                            triggerAction(event.target.getAttribute('action-'+action) , event);
                         });
                     }
     
@@ -55,7 +58,7 @@
           };
     
         var defaultAction = {
-            wait : false,
+            async_wait : false,
             priority : 5,
             action : function(){},
             dependencies : ''
@@ -95,26 +98,26 @@
                 
                 actionSkeleton = {};
                   
-                actionSkeleton.actions = [];
-                actionSkeleton.priority = [];
+                actionSkeleton.actions = {};
+                actionSkeleton.priorities = [];
                   
                 actionsList[actionName] = actionSkeleton;
                   
               }
               
-              if(actionSkeleton.priority.indexOf(action.priority) != -1){
-                  actionSkeleton.priority.push(action.priority);
+              if(actionSkeleton.priorities.indexOf(action.priority) === -1){
+                  actionSkeleton.priorities.push(action.priority);
                   
-                  actionSkeleton.priority[action.priority] = [];
+                  actionSkeleton.actions[action.priority] = [];
                   
                   // sort as per priority
-                  actionSkeleton.priority.sort();
+                  actionSkeleton.priorities.sort();
               }
               
-              var prioritizedAction = actionSkeleton.priority[action.priority];
+              var prioritizedAction = actionSkeleton.actions[action.priority];
               
               var actionInfo = {};
-              actionInfo.wait = action.wait;
+              actionInfo.async_wait = action.async_wait;
               actionInfo.action = action.action;
               actionInfo.dependencies = action.dependencies;
               
@@ -153,7 +156,7 @@
                 this.callback.call(ASYNC_ERROR);
           };
             
-          var triggerAction = function(actionName , [arguments]){
+          var triggerAction = function(actionName , arguments){
               // trigger action with arguments
               
               var action = actionsList[actionName];
@@ -161,42 +164,100 @@
               if(!action)
                   return;
               
-              var prioties = action.priority;
+              var actionArguments = [];
               
-              var actionData = new ActionData(actionName);
-              
-              for(var i=0; i<prioties.length; i++){
-                 var priority = prioties[i];
-                      
-                 var actions = action.actions[priority];
-                  
-                 executeAction(actions , actionData)
-                  
+              if(arguments){
+                   actionArguments.push(arguments);
               }
+              
+              actionArguments.push(new Scope(actionName));
+              
+              executePriority(action , action.priorities , actionArguments , 0);
               
           };
             
-          var executeAction = function(actionsArray , scope) {
-               for(var i=0; i<actionsArray.length; i++){
-                   var action = actionsArray[i];
-                   
-                   var dependencies = action.dependencies.split(" ");
-                   
-                   for(var j=0; )
-                   
-                   action.call()
-               }
+          var executePriority = function(actionRef, prioties , actionArguments , position){
+            
+              if(position >= prioties.length){
+                return;   
+              }
+              
+               var priority = prioties[position];
+                      
+               var prioritizedActions = actionRef.actions[priority];
+              
+               var priority = new PriorityInvoker(prioritizedActions , actionArguments);
+              
+               priority.executeActions();
+              
+               priority.onDone(function(){
+                    executePriority(actionRef , priorities , actionArguments , position++);
+               });
+              
+              priorities.onTerminate(function(){
+                // do nothing
+              });
+              
+               //executeAction(actionsOfPriority , scope)
+              
           };
-    
+            
+          var PriorityInvoker = function(prioritizedActions ,actionArguments){
+              this.prioritizedActions = prioritizedActions;
+              this.actionArguments = actionArguments;
+              
+              this.asyncWaitQueue = 0;
+              
+              
+              
+              this.asyncWaitCallback = function(asyncStatus){
+                  this.asyncWaitQueue = this.asyncWaitQueue - 1;  
+                  if(asyncStatus === ASYNC_DONE){
+                            if(this.asyncWaitQueue == 0){
+                                PriorityInvoker.onDone.call();       
+                            }
+                        
+                    }else if(asyncStatus === ASYNC_ERROR){
+                           PriorityInvoker.onTerminate.call();
+                    }
+              };
+              
+          };
+            
+          PriorityInvoker.prototype.executeActions = function(){
+              for(var i=0; i<this.prioritizedActions.length; i++){
+                   var ac = this.prioritizedActions[i];
+                   
+                   if(ac.async_wait === true){
+                       var asyncExecution = new AsyncExecution(this.asyncWaitCallback);
+                       this.asyncWaitQueue = this.asyncWaitQueue + 1;
+                       
+                       this.actionArguments.push(asyncExecution);
+                   }
+                  
+                  if(!ac.action.apply(this.actionArguments)){
+                        PriorityInvoker.onTerminate.call();
+                  }
+               }
+              
+              if(this.asyncWaitQueue === 0){
+                  PriorityInvoker.onDone.call();  
+              }
+          };
+            
+          PriorityInvoker.prototype.onDone = function(callback){
+              callback.call();
+          };
+            
+          PriorityInvoker.prototype.onTerminate = function(callback){
+                callback.call();  
+          };
+            
           var addURLAction = function(actionsJSON){
     
               for(action in actionsJSON){
-    
-                  var actionData = {
-                      action : actionsJSON[action]
-                  }
-    
-                  addAction(action , actionData);
+                    routerList[action] = actionsJSON[action];
+                  //addAction(action , actionData);
               }
     
           };
@@ -218,10 +279,20 @@
               triggerAction(hash);
               compile();
           };
+            
+          var navigate = function(hash , data){
+              if(routerList[hash])
+                window.location.hash - hash;
+                triggerAction(routerList[hash] , data);
+          };
+            
+          window.onload = function(){
+              compile();
+          };
     
           return {
     
-              registerURLAction : function (actionsJSON){
+              router : function (actionsJSON){
                   addURLAction(actionsJSON);
               },
     
@@ -231,11 +302,21 @@
     
               version : function (){
                   return VERSION;
+              },
+              
+              trigger : function(actionName , arguments){
+                  triggerAction(actionName , arguments);
+              },
+              
+              navigate : function(hash , data){
+                navigate(hash , data);   
               }
     
           }
     
-          var previousAction = actionjs;
+        };
+        
+         var previousAction = actionjs();
     
           var action = previousAction;
     
@@ -244,7 +325,5 @@
           }
     
           return action;
-    
-        };
     
     })();
