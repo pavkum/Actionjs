@@ -22,8 +22,9 @@ action.on('toContact' , {
 
 action.on('malla' , {
     priority:2,
-    action : function(){
-        console.log(2);
+    action : function(scope){
+        console.log(scope.get('name'));
+        
         document.getElementById('hash').innerHTML = "malla" 
         return true;
     }
@@ -31,7 +32,8 @@ action.on('malla' , {
 
 action.on('malla' , {
     priority:1,
-    action : function(){
+    action : function(scope){
+        scope.set('name' , 'pavan');
         console.log(1);
         document.getElementById('hash').innerHTML = "malla" 
         return true;

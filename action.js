@@ -245,7 +245,7 @@
                        this.actionArguments.push(asyncExecution);
                    }
                   
-                  if(!ac.action.apply(this.actionArguments)){
+                  if(!ac.action.apply(null , this.actionArguments)){
                         this.onTerminate.call(this);
                   }
                }
