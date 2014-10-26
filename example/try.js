@@ -31,17 +31,22 @@ action.on('malla' , {
     }
 });
 
+action.preActions('malla' , 'toContact');
+action.postActions('malla' , 'toHome');
+
 action.on('malla' , {
     priority:1,
-    action : function(scope){
+    async_wait : true,
+    action : function(scope , asyncExc){
         scope.set('name' , 'pavan');
         console.log(1);
         document.getElementById('hash').innerHTML = "malla"
 
         setTimeout(function(){
-          action.navigate('contact' , 'abc');
+          //action.navigate('contact' , 'abc');
+          asyncExc.error();
         },1000);
 
-        return false;
+        return true;
     }
 });

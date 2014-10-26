@@ -19,12 +19,14 @@
                                                 }
                                             ]
                                     ],
-                            'priorities' : [1,2,3]
+                            'priorities' : [1,2,3],
+                            'preactions' : [],
+                            'postactions' : []
                          }
 
           */
-          var actionsList = [];
-          var routerList = [];
+          var actionsList = {};
+          var routerList = {};
 
           var uiActions = 'click dblclick mousedown mouseup mouseover mouseout mousemove mouseenter mouseleave keydown keyup keypress submit focus blur copy cut paste';
 
@@ -95,14 +97,7 @@
               var actionSkeleton = actionsList[actionName];
 
               if(!actionSkeleton){
-
-                actionSkeleton = {};
-
-                actionSkeleton.actions = {};
-                actionSkeleton.priorities = [];
-
-                actionsList[actionName] = actionSkeleton;
-
+                  actionSkeleton = createActionSkeleton(actionName);
               }
 
               if(actionSkeleton.priorities.indexOf(action.priority) === -1){
@@ -126,6 +121,65 @@
 
           };
 
+          var createActionSkeleton = function(actionName){
+              var actionSkeleton = {};
+
+              actionSkeleton.actions = {};
+              actionSkeleton.priorities = [];
+              actionSkeleton.preActions = [];
+              actionSkeleton.postActions = [];
+
+              actionsList[actionName] = actionSkeleton;
+
+              return actionSkeleton;
+          }
+
+          var addPreActions = function(actionName, preActions){
+
+              if(!preActions){
+                  return;
+              }
+
+              var actionSkeleton = actionsList[actionName];
+
+              if(!actionSkeleton){
+                  actionSkeleton = createActionSkeleton(actionName);
+              }
+
+              var preActionsList = actionSkeleton.preActions;
+
+              if(typeof preActions === "string"){
+                  preActionsList.push(preActions);
+              }else{
+                  preActionsList.push(preActions.toString());
+              }
+
+
+          };
+
+          var addPostActions = function(actionName , postActions){
+              if(!postActions){
+                  return;
+              }
+
+              var actionSkeleton = actionsList[actionName];
+
+              if(!actionSkeleton){
+                  actionSkeleton = createActionSkeleton(actionName);
+              }
+
+              var postActionsList = actionSkeleton.postActions;
+
+              if(typeof postActions === "string"){
+                  postActionsList.push(postActions);
+              }else{
+                  postActionsList.push(postActions.toString());
+              }
+
+
+
+          };
+
           var Scope = function(actionName){
                 this.name = actionName;
           };
@@ -144,21 +198,22 @@
           var ASYNC_DONE = 1;
           var ASYNC_ERROR = -1;
 
-          var AsyncExecution = function(callback){
+          var AsyncExecution = function(context , callback){
+                this.context = context;
                 this.callback = callback;
           };
 
           AsyncExecution.prototype.resolve = function(){
-                this.callback.call(ASYNC_DONE);
+                this.callback.call(this.context , ASYNC_DONE);
           };
 
           AsyncExecution.prototype.error = function(){
-                this.callback.call(ASYNC_ERROR);
+                this.callback.call(this.context , ASYNC_ERROR);
           };
 
-          var triggerAction = function(actionName , arguments){
+          var triggerAction = function(actionName , arguments , scope){
               // trigger action with arguments
-
+              console.log(actionName);
               var action = actionsList[actionName];
 
               if(!action)
@@ -170,9 +225,24 @@
                    actionArguments.push(arguments);
               }
 
-              actionArguments.push(new Scope(actionName));
+              if(!scope){
+                scope = new Scope(actionName);
+                actionArguments.push(scope);
+              }
+
+              var preActions = action.preActions;
+
+              for(var i=0; i<preActions.length; i++){
+                  triggerAction(preActions[i] , arguments , scope);
+              }
 
               executePriority(action , action.priorities , actionArguments , 0);
+
+              var postActions = action.postActions;
+
+              for(var i=0; i<postActions.length; i++){
+                  triggerAction(postActions[i] , arguments , scope);
+              }
 
           };
 
@@ -197,7 +267,7 @@
                });
 
                priority.onTerminate(function(){
-                // do nothing
+
                });
 
                priority.executeActions();
@@ -243,20 +313,27 @@
           };
 
           PriorityInvoker.prototype.executeActions = function(){
+              var terminate = false;
               for(var i=0; i<this.prioritizedActions.length; i++){
                    var ac = this.prioritizedActions[i];
 
                    if(ac.async_wait === true){
-                       var asyncExecution = new AsyncExecution(this.asyncWaitCallback);
+                       var asyncExecution = new AsyncExecution(this , this.asyncWaitCallback);
                        this.asyncWaitQueue = this.asyncWaitQueue + 1;
 
                        this.actionArguments.push(asyncExecution);
                    }
 
                   if(!ac.action.apply(null , this.actionArguments)){
-                        this.terminate();
+                        terminate = true;
+                        break;
                   }
                }
+
+              if(terminate){
+                  this.terminate();
+                  return;
+              }
 
               if(this.asyncWaitQueue === 0){
                  this.done();
@@ -276,16 +353,16 @@
 
           // poll for hash change
 
-          // setInterval(function(){
-          //
-          //     var presentHash = window.location.hash;
-          //
-          //     if(hash != presentHash){
-          //        hash = presentHash;
-          //        triggerHashChange();
-          //     }
-          //
-          // },500);
+          setInterval(function(){
+
+              var presentHash = window.location.hash;
+
+              if(hash != presentHash){
+                 hash = presentHash;
+                 triggerHashChange();
+              }
+
+          },500);
 
           var triggerHashChange = function(){
               var presentHash = hash.substr(1,hash.length);
@@ -297,10 +374,11 @@
 
           };
 
-          var navigate = function(hash , data){
-              if(routerList[hash]){
-                window.location.hash = hash;
-                triggerAction(routerList[hash] , data);
+          var navigate = function(presentHash , data){
+              if(routerList[presentHash]){
+                window.location.hash = presentHash;
+                hash = window.location.hash;
+                triggerAction(routerList[presentHash] , data);
                   compile();
               }
           };
@@ -323,6 +401,14 @@
 
               on : function(actionData , action){
                   addAction(actionData , action);
+              },
+
+              preActions : function(actionName , preActions){
+                  addPreActions(actionName , preActions);
+              },
+
+              postActions : function(actionName , postActions){
+                  addPostActions(actionName , postActions);
               },
 
               version : function (){
