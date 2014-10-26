@@ -126,8 +126,9 @@
 
               actionSkeleton.actions = {};
               actionSkeleton.priorities = [];
-              actionSkeleton.preActions = [];
-              actionSkeleton.postActions = [];
+              actionSkeleton.preActions = []; // check cyclic dependencies
+              actionSkeleton.postActions = []; // check cyclic dependencies
+              actionSkeleton.onerror = []; // check cyclic dependencies
 
               actionsList[actionName] = actionSkeleton;
 
@@ -175,9 +176,32 @@
               }else{
                   postActionsList.push(postActions.toString());
               }
+          };
 
+          var addErrorActions = function(actionName , errorActions){
+              if(!errorActions){
+                  return;
+              }
 
+              var actionSkeleton = actionsList[actionName];
 
+              if(!actionSkeleton){
+                  actionSkeleton = createActionSkeleton(actionName);
+              }
+
+              var errorActionsList = actionSkeleton.errorActions;
+
+              if(typeof errorActions === "string"){
+                  errorActionsList.push(errorActions);
+              }else{
+                  errorActionsList.push(errorActions.toString());
+              }
+          };
+
+          var configure = function(actionName , configJson){
+              addPreActions(actionName , configJson.preActions);
+              addPostActions(actionName , configJson.postActions);
+              addErrorActions(actionName , configJson.errorActions);
           };
 
           var Scope = function(actionName){
@@ -409,6 +433,10 @@
 
               postActions : function(actionName , postActions){
                   addPostActions(actionName , postActions);
+              },
+
+              configure : function(actionName , configJson){
+                  configure(actionName , configJson);
               },
 
               version : function (){
